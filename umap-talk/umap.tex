@@ -1,0 +1,502 @@
+\documentclass{beamer}
+%Information to be included in the title page:
+\title{Manifold Learning and UMAP}
+\author{Paul Snopov}
+\institute{MIPT \& IITP}
+\date{November, 29, 2021}
+\usepackage[english]{babel}
+\usetheme{CambridgeUS}
+
+\usepackage{amsmath,amsfonts,amssymb,euscript,graphicx,wrapfig,multirow,mathtools,amsthm}
+
+%%% Работа с картинками
+\usepackage{graphicx}  % Для вставки рисунков
+\graphicspath{{./images/}}  % папки с картинками
+\setlength\fboxsep{3pt} % Отступ рамки \fbox{} от рисунка
+\setlength\fboxrule{1pt} % Толщина линий рамки \fbox{}
+\usepackage{wrapfig} % Обтекание рисунков и таблиц текстом
+\usepackage[export]{adjustbox}
+\usepackage{caption}
+\captionsetup[figure]{labelsep=space}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{tikz-cd}
+\usetikzlibrary{babel}
+\usepackage{tabularx}
+
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\DeclareMathOperator{\Sing}{Sing}
+\DeclareMathOperator{\Nat}{Nat}
+\newtheorem{defn}{Definition}
+\newtheorem*{theorem*}{Theorem}
+\newtheorem*{lemma*}{Lemma}
+\newtheorem*{conjecture}{Conjecture}
+\newtheorem{consequence}{Следствие}
+\newtheoremstyle{named}{}{}{\itshape}{}{\bfseries}{.}{.5em}{\thmnote{#3's }#1}
+\theoremstyle{named}
+\newtheorem*{namedtheorem}{Theorem}
+
+
+\begin{document}
+
+\frame{\titlepage}
+
+\begin{frame}{Overview}
+\tableofcontents
+\end{frame}
+
+\section{What is Manifold Learning}
+
+\begin{frame}{What is Manifold Learning}
+	\begin{enumerate}
+		\item An approach to non-linear dimensionality reduction
+		\item The input data is assumed to be sampled from a low dimensional manifold embedded in some $\mathbb{R}^n$ for sufficiently large $n$
+		\item Manifold Learning methods look for that low dimensional representation of original data
+	\end{enumerate}
+\end{frame}
+
+\begin{frame}{What is Manifold Learning}
+	\begin{figure}[htp]
+		\centering
+		\includegraphics[width=0.65\textwidth]{manifold_learning.png}
+		\caption{The image is taken from \url{https://www.researchgate.net/figure/Swiss-roll-data-set-Fig-11-Three-dimensional-clusters-data-set_fig7_224189094}}
+	\end{figure}
+\end{frame}
+
+\subsection{Different Approaches}
+
+\begin{frame}
+		\begin{figure}[htp]
+		\centering
+		\includegraphics[width=0.8\textwidth]{different_manifold_learning.png}
+		\caption{The image is taken from \cite{docs}}
+	\end{figure}
+\end{frame}
+
+\subsection{What is UMAP}
+
+\begin{frame}{The idea behind UMAP}
+	Let's suppose our data $X = \{ x_1, ..., x_N \}$ lies on a manifold in some ambient metric space. 
+	
+	The idea of UMAP is sort of borrowed from TDA: having finite sets of points, we can consider balls about each point and construct Cech complex via these balls. By Nerve theorem, this complex will give us a representation of the manifold the data is sampled from.
+\end{frame}
+
+\begin{frame}{The idea behind UMAP}
+	\begin{figure}[htp]
+		\centering
+		\includegraphics[width=.3\textwidth]{sine_wave_1.png}\hfill
+		\includegraphics[width=.3\textwidth]{sine_wave_2.png}\hfill
+		\includegraphics[width=.3\textwidth]{sine_wave_3.png}
+		\caption{Images are taken from \cite{docs}}
+	\end{figure}
+\end{frame}
+
+\begin{frame}{The idea behind UMAP}
+	If the data were uniformly distributed, the appropriate radius would have been chosen easily($ \frac{d(x_i, x_j)}{2} + \varepsilon $).
+	\begin{figure}[htp]
+		\centering
+		\includegraphics[width=0.7\textwidth]{sine_wave_4.png}
+		\caption{The image is taken from \cite{docs}}
+	\end{figure}
+\end{frame}
+
+\begin{frame}{The idea behind UMAP}
+	Assuming the data is uniformly distributed on $\cal{M}$, any ball of fixed volume should contaion approx. the same number of points of $X$ regardless of where on the manifold it's centered. And conversely, a ball centered at $X_i$ that contains exactly $k$ neighbors should have approx. fixed volume regardless of the choice of $X_i \in X$. 
+\end{frame}
+
+\begin{frame}{The idea behind UMAP}
+	But real world data simply isn’t that nicely behaved. How to fix this?
+	\newline
+	\newline
+	A: let's suppose that the data {\it is} uniformly distributed on the manifold, but if the data looks like it isn’t uniformly distributed that must simply be because the notion of distance is varying across the manifold – space itself is warping: stretching or shrinking according to where the data appear sparser or denser.
+	
+	By assuming that the data is uniformly distributed we can actually compute an approx. of a local notion of distance for each point.
+\end{frame}
+
+\begin{frame}
+		\begin{figure}[htp]
+		\centering
+		\includegraphics[width=0.7\textwidth]{sine_wave_1.png}
+		\caption{The image is taken from \cite{docs}}
+	\end{figure}
+\end{frame}
+
+\section{UMAP: theoretical side}
+
+\subsection{Local distance}
+
+\begin{frame}{Local distance}
+	
+	Let $\cal{M}$ be the manifold on which the data lie on and $g$ be the Riemannian metric on it.
+	
+	\begin{lemma*}
+		Let $(\cal{M}, \text{g} )$ be in ambient $\mathbb{R}^n$ and $p \in \cal{M}$. If $g$ is locally constant about $p$ in an open nbhd $U$ s.t. $g$ is constant diagonal matrix in ambient coordinates, then in a unit ball $B(p) \subseteq U$(i.e. with volume $\frac{\pi^{n/2}}{\Gamma(n/2+1)}$ w.r.t. $g$), the geodesic distance from $p$ to any point $q \in B(p)$ is $\frac{1}{r}d_{\mathbb{R}^n}(p,q)$, where $r$ -- the radius of $B(p)$ in the ambient space.
+	\end{lemma*}
+	
+\end{frame}
+
+\begin{frame}{Local distance}
+			\begin{figure}[htp]
+		\centering
+		\includegraphics[width=0.7\textwidth]{sine_wave_5.png}
+		\caption{The image is taken from \cite{docs}}
+	\end{figure}
+\end{frame}
+
+
+\begin{frame}{Local distance}
+	By previous lemma, we can approx. geodesic distance from $X_i$ to its neighbors by normalising distances w.r.t. the distance of the farthest neighbor, i.e. creating custom distances for each $X_i$. 
+	
+	Thus now we have a family of discrete metric spaces for each $X_i$. And we need to merge it into something global. This can be done by converting the metric spaces into fuzzy simplicial sets.
+\end{frame}
+
+\subsection{Review for simplicial sets}
+
+\begin{frame}{Review for simplicial sets}
+	\begin{definition}
+		The category $\pmb{\Delta}$ is called \text{\it simplicial category}. It's the category with:
+		\begin{enumerate}
+			\item Objects are finite order sets $[0], [1], ... [n] = \{ 0, 1, ..., n \}$
+			\item Morphism $[n] \to [m]$ is order-preserving map
+		\end{enumerate}
+	\end{definition}
+	\begin{definition}
+	A {\it simplicial set} is a presheaf on $\pmb{\Delta}$
+\end{definition}
+\end{frame}
+
+\begin{frame}{Review for simplicial sets}
+	
+	Standard $n$-simplex $\mathbf{\Delta}^n$ is defined as the functor $\hom(-,[n])$. By the Yoneda lemma, for simplicial set $X$, $X([n]) \simeq \Nat(\mathbf{\Delta}^n, X)$, moreover, the next theorem holds
+	
+	\begin{theorem}[Density theorem for simplicial set]
+		Let $X$ be a presheaf, then $X \simeq \lim\limits_{\to}\mathbf{\Delta}^n $ 
+	\end{theorem}
+\end{frame}
+
+\begin{frame}{Review for simplicial sets}
+	There is a standard covariant functor geometric realization $ |\cdot| : \pmb{\Delta} \to \pmb{Top}$ that sends $[n]$ to the standard $n$-simplex $|\mathbf{\Delta}^n| \subseteq \mathbb{R}^{n+1}$
+	
+	\[
+			|\mathbf{\Delta}^n| = \{ (t_0, ..., t_n) \in \mathbb{R}^{n+1} | \sum\limits_{i=0}^{n} t_i = -log(a) \}
+	\]
+	
+	For simplicial set, one can construct $|X|$ as the colimit 
+	\[
+		|X| = \lim\limits_{\to} |\mathbf{\Delta}^n|
+	\]
+\end{frame}
+
+\begin{frame}{Review for simplicial sets}
+	Conversely, for topological space $Y$ one can construct associated simplicial set $\Sing(Y)$ -- singular set of $Y$, by defining:
+	\[
+		\Sing(Y): [n] \mapsto \hom_{\pmb{Top}}(|\mathbf{\Delta}^n|, Y)
+	\]
+	It's known from homotopy theory that $|\cdot| \dashv \Sing$
+\end{frame}
+
+\subsection{Fuzzy simplicial sets}
+
+\begin{frame}{Fuzzy sets}
+	Classical theory of singular sets and topological realization can be extended to fuzzy singular sets and metric realization(due to Spivak \cite{spivak}).
+	\newline
+	\newline
+	Classically, a {\it fuzzy set} is defined in terms of a carrier set $A$ and a map $\nu: A \to [0,1]$ -- {\it membership function}. The value $\nu(x)$ is sort of the membership strength of $x$ to the set $A$.
+\end{frame}
+
+\begin{frame}{Fuzzy sets}
+	Let $I = (0,1]$ with topology given by intervals of the form $(0,a)$ for $a \in (0,1]$. Let's consider the category of open sets of $\pmb{Op(I)}$.
+	
+	\begin{definition}
+		A fuzzy set is a presheaf $\cal{P}$ on $\pmb{Op(I)}$ such that all maps $\cal{P}(\text{a} \leq \text{b})$ are injections.
+	\end{definition}
+	
+	To link to the classical approach to fuzzy sets one can think of a section $\cal{P}((\text{0,a}))$ as the set of all elements with membership strength at least $a$.
+\end{frame}
+
+\begin{frame}{Category of fuzzy sets}
+	Under the Grothendieck topology on $\pmb{Op(I)}$, presheaves are trivially sheaves, and then
+	\begin{definition}
+		The category $\pmb{Fuzz}$ of fuzzy sets is the full subcategory of sheaves on $I$ spanned by fuzzy sets
+	\end{definition}
+\end{frame}
+
+\begin{frame}{Category of fuzzy simplicial sets}
+	\begin{definition}
+		The category of fuzzy simplicial sets $\pmb{sFuzz}$ is the category of presheaves on $\pmb{\Delta}$ with value in $\pmb{Fuzz}$
+	\end{definition}
+	We will use $\mathbf{\Delta}^n_{<a}$ to denote the sheaf given by representable functor of the object $([n], (0,a))$. The importance of this fuzzy version of simplicial sets is their relation to metric spaces.
+\end{frame}
+
+\subsection{Extended-pseudo-metric spaces}
+
+\begin{frame}{Category of extended-pseudo-metric spaces}
+	\begin{definition}
+		An extended-pseudo-metric space (e.p. metric space) $(X,d)$ is a metric space in which the distance between two distinct points can be either $0$, or $\infty$.
+		
+		The category of e.p. metric spaces $\pmb{EPMet}$ has non-expansive maps as morphisms. The subcategory of finite e.p. metric spaces is $\pmb{FinEPMet}$.
+	\end{definition}
+\end{frame}
+
+\begin{frame}{Extensions of classical constructions}
+	In \cite{spivak} Spivak constructs a pair of adjoint functors $Real \dashv Sing$ between categories $\pmb{sFuzz}$ and $\pmb{EPMet}$, which are just the natural extension of the classical functors from algebraic topology. 
+	
+	The functor $Real$ is defined for standard fuzzy simplices $\mathbf{\Delta}^n_{<a}$ as:
+	\[
+		Real(\mathbf{\Delta}^n_{<a}) = \{ (t_0, ..., t_n) \in \mathbb{R}^{n+1} | \sum\limits_{i=0}^{n} t_i = -log(a) \},
+	\]
+	similarly to the classical realization functor $| \cdot |$. The metric on $Real(\mathbf{\Delta}^n_{<a})$ is inherited from ambient space. A morphism $\mathbf{\Delta}^n_{<a} \to \mathbf{\Delta}^m_{<b}$ exists iff $a \leq b$ and is determined by a $\pmb{\Delta}$ morphism $\sigma: [n] \to [m]$. The action of $Real$ on such morphism is a map
+	\[
+		(x_0, ..., x_n) \mapsto \frac{log(b)}{log(a)}\big( \sum\limits_{i_0 \in \sigma^{-1}(0)}x_{i_0}, ..., \sum\limits_{i_0 \in \sigma^{-1}(m)}x_{i_0} \big)
+	\]
+\end{frame}
+
+\begin{frame}{Extensions of classical constructions}
+	For general simplicial set $X$, we can define
+\[
+Real(X) = \lim\limits_{\to} Real(\mathbf{\Delta}^n_{<a})
+\]
+Analogously to the classical case, we can define functor $Sing$:
+\[
+Sing(Y): ([n], (0,a)) \mapsto \hom_{\pmb{EPMet}} (Real(\mathbf{\Delta}^n_{<a}), Y)
+\]
+But in our case, we are interested in finite metric spaces. We can consider subcategory of bounded fuzzy simplicial sets $\pmb{Fin-sFuzz}$ and therefore use the analogous adjoint pair $FinReal$ and $FinSing$.
+	\begin{definition}
+		Define $FinReal : \pmb{Fin-sFuzz} \to \pmb{FinEPMet} $ by setting $FinReal(\mathbf{\Delta}^n_{<a}) = ({x_1, ..., x_n}, d_a)$, where
+		\[
+		d_a(x_i, x_j) = \begin{cases}
+		-log(a) \text{ if } i \neq j \\
+		0 \text{ otherwise}
+		\end{cases}
+		\]
+\end{definition}
+\end{frame}
+
+\begin{frame}{Extensions of classical constructions}
+	Similarly, for bounded simplicial set $X$ $FinReal(X) = \lim\limits_{\to} FinReal(\mathbf{\Delta}^n_{<a})$.
+	
+	Similar to Spivak's construction, for map $\mathbf{\Delta}^n_{<a} \to \mathbf{\Delta}^m_{<b} $, the action of $FinReal$ is given by 
+	\[
+		({x_1, ..., x_n}, d_a) \mapsto ({x_\sigma(1), ..., x_\sigma(n)}, d_b)
+	\]
+	\begin{definition}
+		Define $FinSing : \pmb{FinEPMet} \to  \pmb{Fin-sFuzz} $ by
+		\[
+			FinSing(Y) : ([n], (0,a)) \mapsto \hom_{\pmb{FinEPMet}} (FinReal(\mathbf{\Delta}^n_{<a}), Y)
+		\]
+	\end{definition}
+\end{frame}
+
+
+\begin{frame}{Extensions of classical constructions}
+	The main theorem:
+	\begin{theorem}
+		The functors $FinReal$ and $FinSing$ form adjunction $FinReal \dashv FinSing$
+	\end{theorem}
+\end{frame}
+
+\subsection{Returning to the problem}
+
+\begin{frame}{Returning to our problem}
+	Now we can handle the family of incompatible metric spaces described above. Each metric space can be translated into a fuzzy simplicial set via the fuzzy singular set functor. We get the family of fuzzy simplicial sets for which we can just take a fuzzy union across the entire family. The result is a single fuzzy simplicial set which captures the relevant topological and metric structure of the manifold $\cal{M}$.
+\end{frame}
+
+\begin{frame}{Returning to our problem}
+	But fuzzy singular functor applies to e.p. metric spaces. The result of Lemma 1 only provide accurate approx. of geodesic distance local to $X_i$ for distances measured from $X_i$ –
+	the geodesic distances between other pairs of points within the neighborhood of $X_i$ are not well defined. So due to the lack of information, let $d_i(X_j, X_k) = \infty$ for $i \neq j$ and $i \neq k$.
+\end{frame}
+
+\begin{frame}{Returning to our problem}
+	\begin{definition}
+		Let $X = \{ X_1, ..., X_N \}$ be a dataset in $\mathbb{R}^n$ and let $ \{ (X, d_i) \} $ be a family of e.p. metric spaces such that
+		
+		\[
+			d_i(X_j, X_k) = \begin{cases}
+			d_{\cal{M}}(X_j, X_k) - \rho \text{ if } i = j \text{ or } i = k \\
+			\infty \text{ otherwise}
+			\end{cases}
+		\]
+		where $\rho$ is the distance to the nearest neighbor of $X$ and $d_{\cal{M}}$ is geodesic distance on the manifold.
+		
+		The fuzzy topological representation of $X$ is 
+		\[
+			\bigcup\limits_{i=0}^n FinSing((X, d_i))
+		\]
+	\end{definition}
+\end{frame}
+
+\begin{frame}{Local connectivity}
+	Why we substract $\rho$ there? It's because we assume that our manifold is locally connected. This assumption is natural in topological sense and actually helps us to prevent the curse of dimensionality \cite{talk}.
+	\begin{figure}[htp]
+		\centering
+		\includegraphics[width=0.7\textwidth]{sine_wave_6.png}
+		\caption{The image is taken from \cite{docs}}
+	\end{figure}
+	
+\end{frame}
+
+\section{Optimizing a low dimensional representation}
+
+\subsection{Layout}
+
+\begin{frame}{Layout}
+	Let $Y = \{ Y_1, ..., Y_N \} \subseteq \mathbb{R}^d$ be a low dim. representation of X. Since we know apriori a manifold on which $Y$ lies on(usually just $\mathbb{R}^d$) we can compute fuzzy topological representation directly.
+
+	
+We will use fuzzy set cross entropy to compare 2 fuzzy sets. For this, we need to revert to classical fuzzy set notation, i.e. to a reference set $A$ and function $\nu: A \to [0,1]$. Having fuzzy simplicial set $\cal{P}$, we can let $A = \bigcup\limits_{a \in (0,1]} \cal{P([\text{0},\text{a}))}$ and $\nu(x) = \sup \{ a \in (0,1] | x \in \cal{P([\text{0},\text{a}))} \}$
+\end{frame}
+
+\begin{frame}{Layout}
+	\begin{definition}
+		The cross entropy $C$ of two fuzzy sets $(A,\nu)$ and $(A, \mu)$ is
+		\[
+			C((A,\nu), (A, \mu)) = \sum\limits_{a \in A} \big( \nu(a) \log \frac{\nu(a)}{\mu(a)} + (1 - \nu(a)) \log \frac{1 - \nu(a)}{1 - \mu(a)} \big)
+		\]
+	\end{definition}
+We can optimize embedding $Y$ w.r.t. fuzzy set cross entropy using gradient descent. Fuzzy singular set functor is then approximated via differentiable functions.
+\end{frame}
+
+\iffalse
+\begin{frame}{Layout}
+	So the algorithm is next:
+	\begin{enumerate}
+		\item Construct fuzzy simplicial set
+		\item Optimize the layout of data in low dim. space minimizing the error between topological representations
+	\end{enumerate}
+\end{frame}
+\fi
+
+\section{UMAP: computational side}
+
+\subsection{Basic Structure}
+\begin{frame}{Basic structure for approximating manofild}
+	\begin{itemize}
+		\item Graph Construction
+		\begin{enumerate}
+			\item Construct a weighted $k$-neighbour graph.
+			\item Apply some transform on the edges to ambient local distance.
+			\item Deal with the inherent asymmetry of the $k$-neighbour graph.
+		\end{enumerate}
+		\item Graph Layout
+		\begin{enumerate}
+			\item Define an objective function that preserves desired characteristics of this $k$-neighbour graph.
+			\item Find a low dimensional representation which optimizes this objective function.
+		\end{enumerate}
+	\end{itemize}
+\end{frame}
+
+\subsection{Graph Construction}
+
+\begin{frame}{Graph Construction}
+	From now, let $X = \{ x_1, ..., x_N \}$ be the input dataset with a metric(or dissimilarity measure) $d: X \times X \to \mathbb{R}_{\geq 0}$.
+	
+	Given the hyperparameter $k$, we compute the set $\{ x_{i1}, ..., x_{ik} \}$ of the $k$ nearest neighbors for each $x_i \in X$ under the metric $d$. 
+\end{frame}
+
+
+\begin{frame}[fragile]{Graph Construction}
+	For each $x_i$ we define 2 parameters: $\rho_i$ and $\sigma_i$ s.t.
+	\begin{align*}
+	\rho_i = \min\{ d(x_i, x_j) | 1 \leq j \leq k, d(x_i, x_j) > 0 \} \\
+	\sum\limits_{j=1}^k \exp\big( \frac{ -\max(0, d(x_i, x_j) - \rho_i) }{\sigma_i} \big) = \log_2k
+	\end{align*}
+	\begin{itemize}
+		\item $\rho_i$ -- local connectivity
+		\item $\sigma_i$ -- smoothed normalisation factor, defining the Riemannian metric local to $x_i$
+	\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Graph Construction}
+	Define a weighted directed graph $\bar{G} = (V,E,w)$, where:
+	\begin{itemize}
+		\item Vertices V are just points $X$
+		\item $(x_i, x_j) \in E$ if $x_j$ is a $k$-neighbor of $x_i$
+		\item $w((x_i, x_j)) = \exp\big( \frac{ -\max(0, d(x_i, x_j) - \rho_i) }{\sigma_i} \big)$
+	\end{itemize}
+	This graph is $1$-skeleton of the fuzzy simplicial set associated to the metric space local to $x_i$ where the local metric is defined in terms of $\rho_i$ and $\sigma_i$. The weight -- membership strenth of the corresponding $1$-simplex within the fuzzy simplicial set (or one can think of the weight as the probability that the edge exists).
+\end{frame}
+
+\begin{frame}[fragile]{Unified topological representation}
+	Let $A$ be the weighted adjacency matrix of $\bar{G}$, and consider
+	\[
+		B = A + A^T - A \circ A^T,
+	\]
+	where $\circ$ is the Hadamard product. If $A_{ij}$ -- probability that the directed edge $(x_i, x_j)$ exists, then $B_{ij}$ is the probability that either $(x_i, x_j)$ or $(x_j, x_i)$ exists.
+	
+	Then UMAP graph $G$ is an undirected weigthed graph whose adjacency matrix is $B$.
+\end{frame}
+
+\begin{frame}{Unified topological representation}
+		\begin{figure}[htp]
+		\centering
+		\includegraphics[width=.5\textwidth]{graph1.png}\hfill
+		\includegraphics[width=.5\textwidth]{graph2.png}
+		\caption{Images are taken from \cite{docs}}
+	\end{figure}
+\end{frame}
+
+\subsection{Graph Layout}
+
+\begin{frame}{Force directed graph layout algorithm}
+	UMAP uses a force directed graph layout algorithm in low dimensional space. Force directed layout algorithm requires a description of both the attractive and repulsive forces.
+	
+	In UMAP the attractive force between $i$ and $j$ is 
+	\[
+	\frac{-2ab\norm{y_i - y_j}_2^{2(b-1)}}{1 + \norm{y_i - y_j}_2^2}w((x_i, x_j))(y_i - y_j)
+	\]
+	The repulsive force is given by:
+	\[
+		\frac{2b}{(\varepsilon + \norm{y_i - y_j}_2^2)(1 + a\norm{y_i - y_j}_2^{2b})}(1 - w((x_i, x_j)))(y_i - y_j)
+	\]
+\end{frame}
+
+\begin{frame}{Force directed graph layout algorithm}
+	The algorithm applies iteratively the forces at each edge. Slowly decreasing the forces, it converges to a local minima.
+	
+	The forces are derived from gradients optimising the cross-entropy between UMAP graph $G$ and an equivalent weighted graph $H$ with points $y_i$. 
+	
+	We are looking for the positions of $y_i$ such that $H$ closely approximates $G$. Since $G$ captures the topology of the source data, $H$ matches the topology as closely as the optimization allows.
+\end{frame}
+
+\section{Examples}
+
+\subsection{MNIST}
+
+\begin{frame}{MNIST}
+		\begin{figure}[htp]
+		\centering
+		\includegraphics[width=0.65\textwidth]{mnist.png}
+		\caption{The image is taken from \cite{umap}}
+	\end{figure}
+\end{frame}
+
+\subsection{FashionMNIST}
+
+\begin{frame}{FashionMNIST}
+	\begin{figure}[htp]
+		\centering
+		\includegraphics[width=0.65\textwidth]{fashionmnist.png}
+		\caption{The image is taken from \cite{docs}}
+	\end{figure}
+\end{frame}
+
+
+\begin{frame}
+\frametitle{References}
+\begin{thebibliography}{9}
+	\bibitem{umap}
+	 L. McInnes et. al. -- UMAP: Uniform Manifold
+	Approximation and Projection for
+	Dimension Reduction, 2020
+	
+	\bibitem{spivak}
+	David I Spivak. Metric realization of fuzzy simplicial sets. Self published notes, 2012.
+	
+	\bibitem{docs}
+	"How UMAP works", UMAP documentation. \url{https://umap-learn.readthedocs.io/en/latest/how_umap_works.html}
+
+	\bibitem{talk}
+	UMAP Uniform Manifold Approximation and Projection for Dimension Reduction | SciPy 2018 | \url{https://youtu.be/nq6iPZVUxZU}
+\end{thebibliography}
+\end{frame}
+\end{document}
